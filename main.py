@@ -46,6 +46,7 @@ def sonar_analyse():
         return "OK"
     except Exception as e:
         connection.rollback()
+        print(f"Error: {str(e)}")
         return f"Error: {str(e)}",500
     finally:
         cursor.close()
