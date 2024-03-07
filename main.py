@@ -5,10 +5,10 @@ from mysql.connector import errorcode
 import json
 
 app = Flask(__name__)
-mysql_host = 'rm-<>.mysql.rds.aliyuncs.com'
+mysql_host = '<db_host>'
 mysql_user = '<user>'
 mysql_password = '<password>'
-mysql_database = 'sonarqube_records'
+mysql_database = '<db_name>'
 
 @app.route('/updated/sonar_analyse',methods=['POST'])
 def sonar_analyse():
@@ -20,6 +20,9 @@ def sonar_analyse():
         return jsonify({'error':'Failed to parse JSON data.','message':str(e)}), 500
 
     build_url = ''
+    build_repo_url = ''
+    build_commitid = ''
+    build_repo_branch = ''
     task_id = data['taskId']
     analyse_at = data['analysedAt']
     revision = data['revision']
@@ -29,6 +32,16 @@ def sonar_analyse():
     analyse_result = data['qualityGate']['status']
     if 'sonar.analysis.build_url' in data['properties'].keys():
         build_url = data['properties']['sonar.analysis.build_url']
+
+    if 'sonar.analysis.build_repo_branch'    in data['properties'].keys():
+        build_repo_branch    =     data['properties']['sonar.analysis.build_repo_branch']
+
+    if 'sonar.analysis.build_commitid'       in data['properties'].keys():
+        build_commitid       =     data['properties']['sonar.analysis.build_commitid']
+
+    if 'sonar.analysis.build_repo_url'       in data['properties'].keys():
+        build_repo_url       =     data['properties']['sonar.analysis.build_repo_url']
+
     #################################
     connection = mysql.connector.connect(
         host = mysql_host,
@@ -38,12 +51,12 @@ def sonar_analyse():
         connect_timeout=2
     )
     cursor = connection.cursor()
-    sql = "INSERT INTO analyse_records (task_id, analyse_at, revision, project_key, project_name, branch_name, analyse_result, build_url) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-    values = (task_id,analyse_at,revision,project_key,project_name,branch_name,analyse_result,build_url)
+    sql = "INSERT INTO analyse_records (task_id, analyse_at, revision, project_key, project_name, branch_name, analyse_result, build_url, build_repo_url, build_repo_branch, build_commitid) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    values = (task_id,analyse_at,revision,project_key,project_name,branch_name,analyse_result,build_url,build_repo_url,build_repo_branch,build_commitid)
     try:
         cursor.execute(sql,values)
         connection.commit()
-        return "OK"
+        return "OK",204
     except Exception as e:
         connection.rollback()
         print(f"Error: {str(e)}")
