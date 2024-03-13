@@ -2,12 +2,12 @@
 from flask import Flask, request, jsonify, render_template_string
 import mysql.connector
 from mysql.connector import errorcode
-import json
+import json,os,requests,time
 
 app = Flask(__name__)
 mysql_host = '<db_host>'
-mysql_user = '<user>'
-mysql_password = '<password>'
+mysql_user = '<db_user>'
+mysql_password = '<db_password>'
 mysql_database = '<db_name>'
 
 @app.route('/updated/sonar_analyse',methods=['POST'])
@@ -43,6 +43,57 @@ def sonar_analyse():
         build_repo_url       =     data['properties']['sonar.analysis.build_repo_url']
 
     #################################
+    if os.getenv("debug") is not None:
+        print("Debug mode.")
+        table_name = 'analyse_records_test'
+    else:
+        table_name = 'analyse_records'
+    if os.getenv("SONAR_LOGIN") is not None:
+        print("Get metrics from sonar for project key %s." % project_key)
+        sonar_login = os.getenv("SONAR_LOGIN")
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        }
+        get_measures_params={}
+        get_measures_params['additionalFields'] = 'period,metrics'
+        get_measures_params['branch'] = branch_name
+        get_measures_params['component'] = project_key
+        get_measures_params['metricKeys'] = 'code_smells,bugs,vulnerabilities,duplicated_blocks,security_hotspots,sqale_index'
+
+        metrics_vulnerabilities = '-'
+        metrics_code_smells = '-'
+        metrics_sqale_index = '-'
+        metrics_duplicated_blocks = '-'
+        metrics_bugs = '-'
+        metrics_security_hotspots = '-'
+
+        try:
+            get_measures_req = requests.get(url="https://sonar.onewo.com/api/measures/component",auth=(sonar_login,''),headers=headers,params=get_measures_params,timeout=3)
+            if get_measures_req.status_code == 200:
+                metrics_json = get_measures_req.json()
+                if 'component' in metrics_json.keys():
+                    for m in metrics_json['component']['measures']:
+                        if m['metric'] == "vulnerabilities":
+                            metrics_vulnerabilities = m['value']
+                        if m['metric'] == 'code_smells':
+                            metrics_code_smells = m['value']
+                        if m['metric'] == 'sqale_index':
+                            metrics_sqale_index = m['value']
+                        if m['metric'] == 'duplicated_blocks':
+                            metrics_duplicated_blocks = m['value']
+                        if m['metric'] == 'bugs':
+                            metrics_bugs = m['value']
+                        if m['metric'] == 'security_hotspots':
+                            metrics_security_hotspots = m['value']
+            else:
+                print("Http status code ne 200. [%s]\n Headers:\n%s\n" % (get_measures_req.status_code,get_measures_req.request.headers ))
+        except Exception as e:
+            print(e)
+            pass
+        finally:
+            time.sleep(2)
+
+    #################################
     connection = mysql.connector.connect(
         host = mysql_host,
         user = mysql_user,
@@ -51,12 +102,13 @@ def sonar_analyse():
         connect_timeout=2
     )
     cursor = connection.cursor()
-    sql = "INSERT INTO analyse_records (task_id, analyse_at, revision, project_key, project_name, branch_name, analyse_result, build_url, build_repo_url, build_repo_branch, build_commitid) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-    values = (task_id,analyse_at,revision,project_key,project_name,branch_name,analyse_result,build_url,build_repo_url,build_repo_branch,build_commitid)
+    sql = "INSERT INTO `" + table_name
+    sql = sql+ "` (task_id, analyse_at, revision, project_key, project_name, branch_name, analyse_result, build_url, build_repo_url, build_repo_branch, build_commitid, metrics_vulnerabilities, metrics_code_smells, metrics_sqale_index, metrics_duplicated_blocks, metrics_bugs, metrics_security_hotspots) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    values = (task_id, analyse_at, revision, project_key, project_name, branch_name, analyse_result, build_url, build_repo_url, build_repo_branch, build_commitid, metrics_vulnerabilities, metrics_code_smells, metrics_sqale_index, metrics_duplicated_blocks, metrics_bugs, metrics_security_hotspots)
     try:
         cursor.execute(sql,values)
         connection.commit()
-        return "OK",204
+        return "OK"
     except Exception as e:
         connection.rollback()
         print(f"Error: {str(e)}")
@@ -72,4 +124,4 @@ def page_not_found(e):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8888)
+    app.run(debug=True, host='0.0.0.0', port=9999)
