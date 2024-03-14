@@ -29,8 +29,8 @@ def sonar_analyse():
     project_name = data['project']['name']
     branch_name = data['branch']['name']
     analyse_result = data['qualityGate']['status']
-    if 'sonar.analysis.build_url' in data['properties'].keys():
-        build_url = data['properties']['sonar.analysis.build_url']
+    if 'sonar.analysis.build_url'            in data['properties'].keys():
+        build_url            =     data['properties']['sonar.analysis.build_url']
 
     if 'sonar.analysis.build_repo_branch'    in data['properties'].keys():
         build_repo_branch    =     data['properties']['sonar.analysis.build_repo_branch']
@@ -119,7 +119,6 @@ def sonar_analyse():
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template_string('four zero four'), 404
-
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=9999)
