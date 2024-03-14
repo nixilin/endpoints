@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify, render_template_string
 import mysql.connector
 from mysql.connector import errorcode
@@ -49,13 +48,12 @@ def sonar_analyse():
     else:
         table_name = 'analyse_records'
     if os.getenv("SONAR_LOGIN") is not None:
-        print("Get metrics from sonar for project key %s." % project_key)
+        print("Get metrics from sonar for project key %s branch %s." % (project_key, branch_name))
         sonar_login = os.getenv("SONAR_LOGIN")
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         }
         get_measures_params={}
-        get_measures_params['additionalFields'] = 'period,metrics'
         get_measures_params['branch'] = branch_name
         get_measures_params['component'] = project_key
         get_measures_params['metricKeys'] = 'code_smells,bugs,vulnerabilities,duplicated_blocks,security_hotspots,sqale_index'
@@ -70,25 +68,25 @@ def sonar_analyse():
         try:
             get_measures_req = requests.get(url="https://sonar.onewo.com/api/measures/component",auth=(sonar_login,''),headers=headers,params=get_measures_params,timeout=3)
             if get_measures_req.status_code == 200:
-                metrics_json = get_measures_req.json()
-                if 'component' in metrics_json.keys():
-                    for m in metrics_json['component']['measures']:
-                        if m['metric'] == "vulnerabilities":
-                            metrics_vulnerabilities = m['value']
-                        if m['metric'] == 'code_smells':
-                            metrics_code_smells = m['value']
-                        if m['metric'] == 'sqale_index':
-                            metrics_sqale_index = m['value']
-                        if m['metric'] == 'duplicated_blocks':
-                            metrics_duplicated_blocks = m['value']
-                        if m['metric'] == 'bugs':
-                            metrics_bugs = m['value']
-                        if m['metric'] == 'security_hotspots':
-                            metrics_security_hotspots = m['value']
+                measures_json = get_measures_req.json()
+                if 'component' in measures_json.keys():
+                    for measure in measures_json['component']['measures']:
+                        if measure['metric'] == "vulnerabilities": #
+                            metrics_vulnerabilities = measure['value']
+                        if measure['metric'] == 'code_smells': #
+                            metrics_code_smells = measure['value']
+                        if measure['metric'] == 'sqale_index': #
+                            metrics_sqale_index = measure['value']
+                        if measure['metric'] == 'duplicated_blocks': #
+                            metrics_duplicated_blocks = measure['value']
+                        if measure['metric'] == 'bugs': #
+                            metrics_bugs = measure['value']
+                        if measure['metric'] == 'security_hotspots': #
+                            metrics_security_hotspots = measure['value']
             else:
-                print("Http status code ne 200. [%s]\n Headers:\n%s\n" % (get_measures_req.status_code,get_measures_req.request.headers ))
+                print("Http status code ne 200. [%s]\n Headers:\n%s" % (get_measures_req.status_code,get_measures_req.request.headers ))
         except Exception as e:
-            print(e)
+            print("Error: %s"%e)
             pass
         finally:
             time.sleep(2)
